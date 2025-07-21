@@ -1,0 +1,138 @@
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+import math
+
+board = [" " for _ in range(9)]
+scores = {"X": 0, "O": 0}
+player_name = ""
+ai_name = "AI"
+
+def check_winner(brd, player):
+    win_cond = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+    ]
+    return any(all(brd[i] == player for i in cond) for cond in win_cond)
+
+def is_draw(brd):
+    return " " not in brd
+
+def minimax(brd, depth, is_max):
+    if check_winner(brd, "O"):
+        return 1
+    if check_winner(brd, "X"):
+        return -1
+    if is_draw(brd):
+        return 0
+
+    if is_max:
+        best = -math.inf
+        for i in range(9):
+            if brd[i] == " ":
+                brd[i] = "O"
+                score = minimax(brd, depth + 1, False)
+                brd[i] = " "
+                best = max(score, best)
+        return best
+    else:
+        best = math.inf
+        for i in range(9):
+            if brd[i] == " ":
+                brd[i] = "X"
+                score = minimax(brd, depth + 1, True)
+                brd[i] = " "
+                best = min(score, best)
+        return best
+
+def ai_move():
+    best_score = -math.inf
+    move = None
+    for i in range(9):
+        if board[i] == " ":
+            board[i] = "O"
+            score = minimax(board, 0, False)
+            board[i] = " "
+            if score > best_score:
+                best_score = score
+                move = i
+    if move is not None:
+        board[move] = "O"
+        buttons[move].config(text="O", fg="deepskyblue", state="disabled")
+        check_game_end("O")
+
+def on_click(index):
+    if board[index] == " ":
+        board[index] = "X"
+        buttons[index].config(text="X", fg="deepskyblue", state="disabled")
+        if not check_game_end("X"):
+            window.after(300, ai_move)
+
+def check_game_end(player):
+    if check_winner(board, player):
+        winner = player_name if player == "X" else ai_name
+        messagebox.showinfo("Game Over", f"{winner} wins!")
+        scores[player] += 1
+        update_score()
+        disable_all_buttons()
+        return True
+    elif is_draw(board):
+        messagebox.showinfo("Game Over", "It's a draw!")
+        disable_all_buttons()
+        return True
+    return False
+
+def disable_all_buttons():
+    for btn in buttons:
+        btn.config(state="disabled")
+
+def update_score():
+    score_label.config(
+        text=f"{player_name} (X): {scores['X']}    {ai_name} (O): {scores['O']}"
+    )
+
+def reset_board():
+    global board
+    board = [" " for _ in range(9)]
+    for btn in buttons:
+        btn.config(text=" ", fg="white", state="normal")
+
+def new_game():
+    global scores
+    scores = {"X": 0, "O": 0}
+    update_score()
+    reset_board()
+
+window = tk.Tk()
+window.title("Tic-Tac-Toe (You vs AI)")
+window.configure(bg="black")
+window.resizable(False, False)
+
+player_name = simpledialog.askstring("Player Name", "Enter your name (You are X):")
+if not player_name:
+    player_name = "You"
+
+buttons = []
+for i in range(9):
+    btn = tk.Button(
+        window, text=" ", font=("Helvetica", 36), width=5, height=2,
+        command=lambda i=i: on_click(i),
+        bg="black", fg="white", activebackground="gray20", relief="ridge", bd=2
+    )
+    btn.grid(row=i // 3, column=i % 3, padx=4, pady=4)
+    buttons.append(btn)
+
+score_label = tk.Label(
+    window,
+    text=f"{player_name} (X): 0    {ai_name} (O): 0",
+    font=("Arial", 14, "bold"), bg="black", fg="white"
+)
+score_label.grid(row=3, column=0, columnspan=3, pady=(10, 0))
+
+reset_btn = tk.Button(window, text="Reset Round", command=reset_board, bg="gray20", fg="white")
+reset_btn.grid(row=4, column=0, sticky="ew")
+
+new_game_btn = tk.Button(window, text="New Game", command=new_game, bg="gray20", fg="white")
+new_game_btn.grid(row=4, column=1, columnspan=2, sticky="ew")
+
+window.mainloop()
