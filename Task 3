@@ -1,0 +1,79 @@
+import pandas as pd
+import streamlit as st
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy.sparse import csr_matrix
+
+# ----------------- PAGE CONFIG -----------------
+st.set_page_config(
+    page_title="Movie Recommender 🎥",
+    page_icon="🎬",
+    layout="centered"
+)
+
+# -------------- CUSTOM CSS ---------------------
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f0f2f6;
+    }
+    .stApp {
+        background-image: linear-gradient(to bottom right, #ddeaf6, #fefefe);
+        color: #262730;
+    }
+    h1 {
+        color: #1f4e79;
+        text-align: center;
+    }
+    .recommend-box {
+        background-color: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ---------------- LOAD DATA -------------------
+@st.cache_data
+def load_data():
+    ratings = pd.read_csv("ratings.csv")
+    movies = pd.read_csv("movies.csv")
+    return ratings, movies
+
+ratings, movies = load_data()
+data = pd.merge(ratings, movies, on='movieId')
+
+# --------- CREATE USER-ITEM MATRIX ------------
+user_movie_matrix = data.pivot_table(index='userId', columns='title', values='rating')
+user_movie_matrix_filled = user_movie_matrix.fillna(0)
+sparse_matrix = csr_matrix(user_movie_matrix_filled.values)
+
+# ------------ SIMILARITY CALC -----------------
+movie_similarity = cosine_similarity(sparse_matrix.T)
+movie_similarity_df = pd.DataFrame(movie_similarity, index=user_movie_matrix.columns, columns=user_movie_matrix.columns)
+
+# ------------- RECOMMENDER FUNC ---------------
+def get_movie_recommendations(movie_name, num_recommendations=21):
+    if movie_name not in movie_similarity_df.columns:
+        return []
+    sim_scores = movie_similarity_df[movie_name].sort_values(ascending=False)[1:num_recommendations+1]
+    return sim_scores.index.tolist()
+
+# ----------------- UI -------------------------
+st.markdown("## 🎬 Collaborative Movie Recommendation System")
+st.markdown("Get movie suggestions based on what you like!")
+
+selected_movie = st.selectbox("🎥 Select a movie you like:", list(user_movie_matrix.columns))
+
+num_recs = st.slider("How many movies to recommend?", min_value=1, max_value=15, value=5)
+
+if st.button("🚀 Recommend Similar Movies"):
+    recommendations = get_movie_recommendations(selected_movie, num_recs)
+
+    if recommendations:
+        st.markdown("### 🧠 Recommended For You:")
+        for movie in recommendations:
+            st.markdown(f"<div class='recommend-box'>🎞 {movie}</div>", unsafe_allow_html=True)
+    else:
+        st.warning("Movie not found in similarity matrix.")
